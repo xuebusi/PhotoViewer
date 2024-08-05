@@ -25,11 +25,13 @@ struct ContentView: View {
 // 照片网格
 struct PhotoGridView: View {
     @EnvironmentObject var vm: PhotoViewModel
+    private let screenWidth = UIScreen.main.bounds.width
+    private let gridSpacing: CGFloat = 2
     
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical) {
-                LazyVGrid(columns: Array(repeating: GridItem(spacing: 2), count: 3), spacing: 2) {
+                LazyVGrid(columns: Array(repeating: GridItem(spacing: gridSpacing), count: 3), spacing: gridSpacing) {
                     ForEach(vm.photos.indices, id: \.self) { index in
                         GeometryReader {
                             let size = $0.size
@@ -44,7 +46,7 @@ struct PhotoGridView: View {
                         }
                         .clipShape(.rect)
                         .contentShape(.rect)
-                        .frame(height: (UIScreen.main.bounds.width-4)/3)
+                        .frame(height: (screenWidth - (gridSpacing * 2)) / 3)
                         .onTapGesture {
                             vm.selectedIndex = index
                             withAnimation(.easeInOut(duration: 0.3)) {
@@ -90,7 +92,7 @@ struct PhotoDetailView: View {
                     }
                 }
                 .onAppear {
-                    showButton = false
+                    showButton = true
                 }
             
             Spacer(minLength: 3)
