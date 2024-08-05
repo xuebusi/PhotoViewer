@@ -11,6 +11,22 @@ struct ContentView: View {
     @StateObject private var vm = PhotoViewModel()
     
     var body: some View {
+        if vm.showDetail {
+            PhotoDetailView()
+                .environmentObject(vm)
+                .transition(.scale.combined(with: .opacity))
+        } else {
+            PhotoGridView()
+                .environmentObject(vm)
+        }
+    }
+}
+
+// 照片网格
+struct PhotoGridView: View {
+    @EnvironmentObject var vm: PhotoViewModel
+    
+    var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical) {
                 LazyVGrid(columns: Array(repeating: GridItem(spacing: 2), count: 3), spacing: 2) {
@@ -47,58 +63,51 @@ struct ContentView: View {
                 }
             }
         }
-        .statusBar(hidden: vm.hideStatusBar)
-        .opacity(vm.showDetail ? 0 : 1)
-        .overlay {
-            DetailView()
-                .environmentObject(vm)
-        }
     }
 }
 
-struct DetailView: View {
+// 照片详情
+struct PhotoDetailView: View {
     @EnvironmentObject var vm: PhotoViewModel
     @State private var showButton: Bool = false
     
     var body: some View {
-        if vm.showDetail {
-            GeometryReader {
-                let size = $0.size
-                
-                VStack {
-                    HeaderView()
-                        .environmentObject(vm)
-                        .opacity(showButton ? 1 : 0)
-                    
-                    Spacer()
-                    
-                    CardView()
-                        .environmentObject(vm)
-                        .onTapGesture {
-                            withAnimation {
-                                showButton.toggle()
-                            }
-                        }
-                        .onAppear {
-                            showButton = false
-                        }
-                    
-                    Spacer()
-                    
-                    ThumbnailView()
-                        .environmentObject(vm)
-                        .opacity(showButton ? 1 : 0)
+        VStack(spacing: 0) {
+            HeaderView(selectedIndex: $vm.selectedIndex, photoCount: vm.photos.count) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    vm.showDetail = false
+                    vm.hideStatusBar = false
                 }
-                .frame(width: size.width, height: size.height)
             }
-            .opacity(vm.showDetail ? 1 : 0)
-            .transition(.scale.combined(with: .opacity))
+            .opacity(showButton ? 1 : 0)
+            
+            Spacer(minLength: 3)
+            
+            PhotoCardView(selectedIndex: $vm.selectedIndex, photos: vm.photos)
+                .onTapGesture {
+                    withAnimation {
+                        showButton.toggle()
+                    }
+                }
+                .onAppear {
+                    showButton = false
+                }
+            
+            Spacer(minLength: 3)
+            
+            ThumbnailView(selectedIndex: $vm.selectedIndex, photos: vm.photos)
+                .opacity(showButton ? 1 : 0)
         }
+        .statusBar(hidden: vm.hideStatusBar)
     }
 }
 
+// 照片详情头部
 struct HeaderView: View {
-    @EnvironmentObject var vm: PhotoViewModel
+    @Binding var selectedIndex: Int
+    let photoCount: Int
+    
+    var action: () -> Void
     
     var body: some View {
         HStack {
@@ -106,13 +115,14 @@ struct HeaderView: View {
                 Text("照片")
                     .font(.system(size: 20, weight: .bold))
                 
-                Text("\(vm.selectedIndex + 1)/\(vm.photos.count)")
+                Spacer(minLength: 0)
+                
+                Text("\(selectedIndex + 1)/\(photoCount)")
                     .font(.system(size: 12))
                     .foregroundColor(.primary.opacity(0.5))
             }
-            .frame(height: 43)
             
-            Spacer()
+            Spacer(minLength: 0)
             
             HStack(spacing: 24) {
                 Button(action: {
@@ -126,10 +136,7 @@ struct HeaderView: View {
                 })
                 
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        vm.showDetail = false
-                        vm.hideStatusBar = false
-                    }
+                    action()
                 }, label: {
                     Circle()
                         .fill(.white.opacity(0.06))
@@ -149,63 +156,76 @@ struct HeaderView: View {
     }
 }
 
-struct CardView: View {
-    @EnvironmentObject var vm: PhotoViewModel
+// 照片卡片
+struct PhotoCardView: View {
+    @Binding var selectedIndex: Int
+    let photos: [Photo]
     
     var body: some View {
-        TabView(selection: $vm.selectedIndex) {
-            ForEach(vm.photos.indices, id: \.self) { index in
-                if let image = vm.photos[index].image {
-                    GeometryReader {
-                        let size = $0.size
+        TabView(selection: $selectedIndex) {
+            ForEach(photos.indices, id: \.self) { index in
+                GeometryReader {
+                    let size = $0.size
+                    if let image = photos[index].image {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
-                            .padding(.horizontal, 10)
+                            .padding(.horizontal, 2)
                             .frame(width: size.width, height: size.height)
+                    } else {
+                        Rectangle()
+                            .fill(.clear)
+                            .frame(width: size.width, height: size.height)
+                            .overlay {
+                                Text("图片加载失败")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                            }
                     }
-                    .tag(index)
-                    .background(.black.opacity(0.0000001))
-                    .transition(.scale.combined(with: .opacity))
                 }
+                .background(.black.opacity(0.0000001))
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
     }
 }
 
+// 照片缩略图
 struct ThumbnailView: View {
-    @EnvironmentObject var vm: PhotoViewModel
+    @Binding var selectedIndex: Int
+    let photos: [Photo]
     
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 1) {
-                    ForEach(vm.photos.indices, id: \.self) { index in
-                        if let image = vm.photos[index].image {
+                    ForEach(photos.indices, id: \.self) { index in
+                        if let image = photos[index].image {
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: 36, height: 36)
                                 .clipped()
-                                .border(.primary, width: vm.selectedIndex == index ? 1 : 0)
+                                .border(.primary, width: selectedIndex == index ? 1 : 0)
                                 .onTapGesture {
                                     withAnimation {
-                                        vm.selectedIndex = index
+                                        selectedIndex = index
                                     }
                                 }
                         }
                     }
                 }
                 .padding(.horizontal)
+                .padding(.vertical, 0)
                 .onAppear {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        proxy.scrollTo(vm.selectedIndex, anchor: .center)
+                    withAnimation() {
+                        proxy.scrollTo(selectedIndex, anchor: .center)
                     }
                 }
-                .onChange(of: vm.selectedIndex) { _, _ in
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        proxy.scrollTo(vm.selectedIndex, anchor: .center)
+                .onChange(of: selectedIndex) { _, _ in
+                    withAnimation() {
+                        proxy.scrollTo(selectedIndex, anchor: .center)
                     }
                 }
             }
