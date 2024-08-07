@@ -10,6 +10,7 @@ import SwiftUI
 // 照片详情
 struct PhotoDetailView: View {
     @EnvironmentObject var vm: PhotoViewModel
+    @State private var direction: Direction = .none
     @State private var showButton: Bool = false
     
     var body: some View {
@@ -21,10 +22,11 @@ struct PhotoDetailView: View {
                 }
             }
             .opacity(showButton ? 1 : 0)
+            .opacity(direction != .v ? 1 : 0)
             
             Spacer(minLength: 3)
             
-            PhotoCardView(selectedIndex: $vm.selectedIndex, photos: vm.photos)
+            PhotoCardView2(selectedIndex: $vm.selectedIndex, direction: $direction, photos: vm.photos)
                 .onTapGesture {
                     withAnimation {
                         showButton.toggle()
@@ -38,6 +40,7 @@ struct PhotoDetailView: View {
             
             ThumbnailView(selectedIndex: $vm.selectedIndex, photos: vm.photos)
                 .opacity(showButton ? 1 : 0)
+                .opacity(direction != .v ? 1 : 0)
         }
         .statusBar(hidden: vm.hideStatusBar)
     }
